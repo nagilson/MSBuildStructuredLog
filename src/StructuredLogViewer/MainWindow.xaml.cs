@@ -520,6 +520,12 @@ namespace StructuredLogViewer
             OpenLogFile();
         }
 
+        private void Open_Click_Diff(object sender, RoutedEventArgs e)
+        {
+            OpenLogFile();
+            OpenLogFile();
+        }
+
         private void Build_Click(object sender, RoutedEventArgs e)
         {
             OpenProjectOrSolution();
