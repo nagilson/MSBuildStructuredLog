@@ -2,6 +2,11 @@
 {
     public class NamedNode : TreeNode, IHasTitle
     {
+
+        public NamedNode() { }
+
+        public NamedNode(NamedNode copy) : base(copy) {
+        }
         public string Name { get; set; }
 
         public virtual string LookupKey => Name;

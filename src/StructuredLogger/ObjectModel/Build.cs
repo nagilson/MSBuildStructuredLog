@@ -33,6 +33,41 @@ namespace Microsoft.Build.Logging.StructuredLogger
             }
         }
 
+        public Build()
+        {
+
+        }
+
+        /// <summary>
+        /// Get a deep copy of the Build.
+        /// </summary>
+        /// <param name="buildToCopy">The Build object to make a deep copy of.</param>
+        public Build(Build buildToCopy) : base(buildToCopy)
+        {
+            if (buildToCopy == null)
+            {
+                return;
+            }
+
+            // Copy Build Data
+            version = buildToCopy.version;
+            msbuildExecutablePath = buildToCopy.msbuildExecutablePath;
+            msbuildVersion = buildToCopy.msbuildVersion;
+
+            StringTable = buildToCopy.StringTable;
+
+            IsAnalyzed = buildToCopy.IsAnalyzed;
+            Succeeded = buildToCopy.Succeeded;
+
+            LogFilePath = buildToCopy.LogFilePath;
+            FileFormatVersion = buildToCopy.FileFormatVersion;
+            SourceFilesArchive = buildToCopy.SourceFilesArchive;
+
+            Statistics = buildToCopy.Statistics;
+            TaskAssemblies = buildToCopy.TaskAssemblies;
+            evaluationById = buildToCopy.evaluationById;
+    }
+
         private string msbuildExecutablePath;
         public string MSBuildExecutablePath
         {
