@@ -215,7 +215,7 @@ namespace StructuredLogger.BinaryLogger
             // everything not in the diff would be the same after.
 
             ParsePropertyDifference(_firstBuildReference.Environment, _secondBuildReference.Environment, difference.environmentDifference);
-            //ParseProjectPropertyDifference(false);
+            ParseProjectPropertyDifference(false);
             ParseProjectPropertyDifference(true);
         }
 
@@ -228,13 +228,15 @@ namespace StructuredLogger.BinaryLogger
                 ProjectProperties otherProjectProperties;
                 if ( _secondBuildReference.Projects.TryGetValue(projectReference, out otherProjectProperties))
                 {
-                    difference.projectDifferences[projectReference] = new ProjectDifference();
+                    if (!difference.projectDifferences.ContainsKey(projectReference))
+                    {
+                        difference.projectDifferences[projectReference] = new ProjectDifference();
+                    }
                     ParsePropertyDifference(
                         parseLocalProperties ? projectProperties.Properties : projectProperties.Globals,
                         parseLocalProperties ? otherProjectProperties.Properties : otherProjectProperties.Globals,
                         parseLocalProperties ? difference.projectDifferences[projectReference].propertyDifference : difference.projectDifferences[projectReference].globalDifference
                     );
-                    _secondBuildReference.Projects.Remove(projectReference); // Remove this so we can scan faster for Project B.
                 }
                 else // The project doesn't exist in the other binlog.
                 {
@@ -245,8 +247,10 @@ namespace StructuredLogger.BinaryLogger
 
             foreach(var kvp in _secondBuildReference.Projects)
             {
-                // All of the remaining projects were only in B because they were removed if they were in A.
-                difference.projectDifferences[kvp.Key] = new ProjectDifference(_secondBuildReference._build.Name);
+                if (!difference.projectDifferences.ContainsKey(kvp.Key))
+                {
+                    difference.projectDifferences[kvp.Key] = new ProjectDifference(_secondBuildReference._build.Name);
+                }
             }
         }
 
