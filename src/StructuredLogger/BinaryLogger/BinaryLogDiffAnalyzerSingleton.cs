@@ -43,25 +43,28 @@ namespace StructuredLogger.BinaryLogger
 
             private bool _UseProjectPathsOverNamesToIdentifier;
 
-            public ProjectComparer(bool _UseProjectPathsOverNamesToIdentifier = false)
+            public ProjectComparer(bool useProjectPathsOverNamesToIdentifier = false)
             {
+                _UseProjectPathsOverNamesToIdentifier = useProjectPathsOverNamesToIdentifier;
                 // TODO: intelligent logic for _USEPPONTI
             }
 
-            public bool Equals(Project x, Project y)
+            public bool Equals(Project x, Project y) // This compares projects across machines/binlogs, must be ID agnostic
             {
                 if (x.Name == y.Name)
                 {
                     if (x.TargetsText == y.TargetsText)
                     {
-                        _UseProjectPathsOverNamesToIdentifier = true;
-                        if (_UseProjectPathsOverNamesToIdentifier)
+                        if (x.GlobalProperties == y.GlobalProperties)
                         {
-                            return x.ProjectFile == y.ProjectFile;
-                        }
-                        else
-                        {
-                            return true;
+                            if (_UseProjectPathsOverNamesToIdentifier)
+                            {
+                                return x.ProjectFile == y.ProjectFile;
+                            }
+                            else
+                            {
+                                return true;
+                            }
                         }
                     }
                 }
@@ -125,7 +128,6 @@ namespace StructuredLogger.BinaryLogger
 
         }
 
-        private List<Build> _buildsForDiff = new List<Build>();
         private DiffableBuild _firstBuildReference;
         private DiffableBuild _secondBuildReference;
         public BuildDifference difference;
@@ -135,26 +137,46 @@ namespace StructuredLogger.BinaryLogger
             Debug.Assert(buildsForDiff != null);
             Debug.Assert(buildsForDiff.Count == 2);
 
-            _buildsForDiff = buildsForDiff;
-
-            _firstBuildReference = new DiffableBuild(_buildsForDiff.First());
-            _secondBuildReference = new DiffableBuild(_buildsForDiff.ElementAt(1));
+            _firstBuildReference = new DiffableBuild(buildsForDiff.First());
+            _secondBuildReference = new DiffableBuild(buildsForDiff.ElementAt(1));
 
             BuildAnalyzer.AnalyzeBuild(_firstBuildReference._build);
             BuildAnalyzer.AnalyzeBuild(_secondBuildReference._build);
 
-            _firstBuildReference.Projects = (from project in _firstBuildReference._build.Children.OfType<Project>() select project)
-                .ToDictionary(
-                    p => p,
-                    p => new ProjectProperties()
-                );
-            _secondBuildReference.Projects = (from project in _secondBuildReference._build.Children.OfType<Project>() select project)
-                .ToDictionary(
-                    p => p,
-                    p => new ProjectProperties()
-                );
+            DiscoverAllProjects(_firstBuildReference);
+            DiscoverAllProjects(_secondBuildReference);
 
             FindDifferences();
+        }
+
+        void DiscoverAllProjects(DiffableBuild buildProjectStore)
+        {
+            var topLevelProjects = buildProjectStore._build.Children.OfType<Project>();
+            HashSet<int> visitedProjectIds = new HashSet<int>();
+            Stack<Project> projectsToVisit = new Stack<Project>();
+
+            foreach (var project in topLevelProjects)
+            {
+                projectsToVisit.Push(project);
+            }
+            
+            while(projectsToVisit.Any())
+            {
+                var projectToVisit = projectsToVisit.Pop();
+                buildProjectStore.Projects.Add(projectToVisit, new ProjectProperties());
+                visitedProjectIds.Add(projectToVisit.EvaluationId);
+                ProjectEvaluation projectData = buildProjectStore._build.FindEvaluation(projectToVisit.EvaluationId);
+                var dispatchToInnerBuildNode = projectToVisit.FindFirstChild<NamedNode>(n => n.Name == "DispatchToInnerBuilds");
+                var MSBuildTask = dispatchToInnerBuildNode?.FindFirstChild<NamedNode>(n => n.Name == "MSBuild");
+                var discoveredProjects = MSBuildTask?.Children.OfType<Project>().ToList();
+                foreach (var project in discoveredProjects == null ? new List<Project>() : discoveredProjects)
+                {
+                    if (!visitedProjectIds.Contains(project.EvaluationId))
+                    {
+                        projectsToVisit.Push(project);
+                    }
+                }
+            }
         }
 
         void FindDifferences()
@@ -212,7 +234,7 @@ namespace StructuredLogger.BinaryLogger
             foreach(var kvp in _secondBuildReference.Projects)
             {
                 // All of the remaining projects were only in B because they were removed if they were in A.
-                difference.projectDifferences[kvp.Key] = new ProjectDifference(_secondBuildReference._build.Name);
+                difference.projectDifferences.Add(kvp.Key, new ProjectDifference(_secondBuildReference._build.Name));
             }
         }
 
@@ -275,19 +297,24 @@ namespace StructuredLogger.BinaryLogger
                     if (namedNode.TypeName == "ProjectEvaluation")
                     {
                         var propertyNode = (Property)propertyResult.Node;
-                        build.Projects[GhostProject(build, (ProjectEvaluation)iterParentNode)].Properties[propertyNode.Name] = propertyNode.Value;
+                        var ghostProject = GhostProject(build, (ProjectEvaluation)iterParentNode);
+                        if (ghostProject == null)
+                        {
+                            return;
+                        }
+                        build.Projects[ghostProject].Properties.Add(propertyNode.Name, propertyNode.Value);
                         return;
                     }
-                    else if(namedNode.Name == "Environment") // TODO: handle the bottom two cases
+                    else if(namedNode.Name == "Environment")
                     {
                         var propertyNode = (Property)propertyResult.Node;
-                        build.Environment[propertyNode.Name] = propertyNode.Value;
+                        build.Environment.Add(propertyNode.Name, propertyNode.Value);
                         return;
                     }
                     else if (namedNode.Name == "Global")
                     {
                         var propertyNode = (Property)propertyResult.Node;
-                        build.Globals[propertyNode.Name] = propertyNode.Value;
+                        build.Globals.Add(propertyNode.Name, propertyNode.Value);
                         return;
                     }
                 }
@@ -302,7 +329,13 @@ namespace StructuredLogger.BinaryLogger
 
         Project GhostProject(DiffableBuild build, ProjectEvaluation evaluatedProject)
         {
-            return build.Projects.Where(proj => proj.Key.EvaluationText == evaluatedProject.EvaluationText).FirstOrDefault().Key;
+            var ghost = build.Projects.Where(proj => proj.Key.EvaluationText == evaluatedProject.EvaluationText).FirstOrDefault().Key;
+            if (ghost == null)
+            {
+                Debug.Assert(false, $"A matching project could not be found for the id {evaluatedProject.EvaluationText}." +
+                    $"Build Projects contains: {(from p in build.Projects.Keys select p.EvaluationText).ToList()}");
+            }
+            return ghost;
         }
 
         IEnumerable<SearchResult> ExecuteSearch(Build build, string query)
@@ -310,7 +343,7 @@ namespace StructuredLogger.BinaryLogger
            var search = new Search(
                 new[] { build },
                 build.StringTable.Instances,
-                5000,
+                int.MaxValue,
                 false
              );
             return search.FindNodes(query, CancellationToken.None);
