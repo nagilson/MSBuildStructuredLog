@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading;
 using Microsoft.Build.Logging.StructuredLogger;
 using StructuredLogViewer;
+using static StructuredLogger.BinaryLogger.BinaryLogDiffAnalyzer;
 
 namespace StructuredLogger.BinaryLogger
 {
@@ -45,13 +46,13 @@ namespace StructuredLogger.BinaryLogger
             public ProjectComparer(bool _UseProjectPathsOverNamesToIdentifier = false)
             {
                 // TODO: intelligent logic for _USEPPONTI
-            }    
+            }
 
             public bool Equals(Project x, Project y)
             {
-                if(x.Name == y.Name)
+                if (x.Name == y.Name)
                 {
-                    if(x.TargetsText == y.TargetsText)
+                    if (x.TargetsText == y.TargetsText)
                     {
                         _UseProjectPathsOverNamesToIdentifier = true;
                         if (_UseProjectPathsOverNamesToIdentifier)
@@ -80,13 +81,54 @@ namespace StructuredLogger.BinaryLogger
             }
         }
 
-        private struct BuildDifference
+        public struct BuildDifference
         {
+            public List<Difference<Tuple<string, string>>> globalDifference;
+            public List<Difference<Tuple<string, string>>> environmentDifference;
+            public string binlogAName;
+            public string binlogBName;
+            public Dictionary<Project, ProjectDifference> projectDifferences = new Dictionary<Project, ProjectDifference>(new ProjectComparer());
+
+            public BuildDifference()
+            {
+            }
+        }
+
+        public struct ProjectDifference
+        {
+            public List<Difference<Tuple<string, string>>> propertyDifference = new List<Difference<Tuple<string, string>>>();
+            public string _soleOwner;
+
+            public ProjectDifference()
+            {
+
+            }
+
+            public ProjectDifference(string soleOwner)
+            {
+                propertyDifference = null;
+                _soleOwner = soleOwner;
+            }
+        }
+
+
+        public struct Difference<T>
+        {
+            public T binlogAValue;
+            public T binlogBValue;
+
+            public Difference(T a, T b)
+            {
+                binlogAValue = a;
+                binlogBValue = b;
+            }
+
         }
 
         private List<Build> _buildsForDiff = new List<Build>();
         private DiffableBuild _firstBuildReference;
         private DiffableBuild _secondBuildReference;
+        public BuildDifference difference;
 
         public BinaryLogDiffAnalyzer(List<Build> buildsForDiff)
         {
@@ -143,7 +185,82 @@ namespace StructuredLogger.BinaryLogger
             // Finally, collect the diff. you can erase proprety from the dictionary if same, else add it to diff class. anything remaining in the other dictionary will be a diff also.
             // everything not in the diff would be the same after.
 
+            ParsePropertyDifference(_firstBuildReference.Environment, _secondBuildReference.Environment, difference.environmentDifference);
+            ParsePropertyDifference(_firstBuildReference.Globals, _secondBuildReference.Globals, difference.globalDifference);
+            ParseProjectPropertyDifference();
+        }
 
+        void ParseProjectPropertyDifference()
+        {
+            foreach (var kvp in _firstBuildReference.Projects)
+            {
+                Project projectReference = kvp.Key;
+                ProjectProperties projectProperties = kvp.Value;
+                ProjectProperties otherProjectProperties;
+                if ( _secondBuildReference.Projects.TryGetValue(projectReference, out otherProjectProperties))
+                {
+                    difference.projectDifferences[projectReference] = new ProjectDifference();
+                    ParsePropertyDifference(projectProperties.Properties, otherProjectProperties.Properties, difference.projectDifferences[projectReference].propertyDifference);
+                    _secondBuildReference.Projects.Remove(projectReference); // Remove this so we can scan faster for Project B.
+                }
+                else // The project doesn't exist in the other binlog.
+                {
+                    difference.projectDifferences[projectReference] = new ProjectDifference(_firstBuildReference._build.Name);
+                }
+            }
+
+            foreach(var kvp in _secondBuildReference.Projects)
+            {
+                // All of the remaining projects were only in B because they were removed if they were in A.
+                difference.projectDifferences[kvp.Key] = new ProjectDifference(_secondBuildReference._build.Name);
+            }
+        }
+
+        void ParsePropertyDifference(Dictionary<string, string> PropertySetA, Dictionary<string, string> PropertySetB, List<Difference<Tuple<string, string>>> differenceStorage)
+        {
+            foreach (var kvp in PropertySetA)
+            {
+                string propertyName = kvp.Key;
+                string propertyValue = kvp.Value;
+                string otherValue;
+                if (PropertySetB.TryGetValue(propertyName, out otherValue))
+                {
+                    if (otherValue != propertyValue)
+                    {
+                        differenceStorage.Add(
+                            new Difference<Tuple<string, string>>(
+                                new Tuple<string, string>(propertyName, propertyValue),
+                                new Tuple<string, string>(propertyName, otherValue)
+                            )
+                       );
+                    }
+                    else // If the items are identical, they don't belong in the diff. We remove it to prevent searching again when we scan the other binlog.
+                    {
+                        PropertySetB.Remove(propertyName);
+                    }
+                }
+                else // The key doesn't exist in the other binlog.
+                {
+                    differenceStorage.Add(
+                          new Difference<Tuple<string, string>>(
+                              new Tuple<string, string>(propertyName, propertyValue),
+                              null
+                          )
+                     );
+                }
+            }
+
+            foreach (var kvp in PropertySetB)
+            {
+                // We already removed all similarities.
+                // All that's left will be a diff where the key doesn't exist in the other binlog.
+                differenceStorage.Add(
+                  new Difference<Tuple<string, string>>(
+                      null,
+                      new Tuple<string, string>(kvp.Key, kvp.Value)
+                  )
+             );
+            }
         }
 
         void PopulateBuildWithPropertyInfo(DiffableBuild build, SearchResult propertyResult)
