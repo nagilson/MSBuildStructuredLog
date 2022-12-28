@@ -132,7 +132,7 @@ namespace StructuredLogger.BinaryLogger
 
         private DiffableBuild _firstBuildReference;
         private DiffableBuild _secondBuildReference;
-        public BuildDifference difference;
+        public BuildDifference difference = new BuildDifference();
 
         public BinaryLogDiffAnalyzer(List<Build> buildsForDiff)
         {
@@ -147,6 +147,9 @@ namespace StructuredLogger.BinaryLogger
 
             DiscoverAllProjects(_firstBuildReference);
             DiscoverAllProjects(_secondBuildReference);
+
+            difference.binlogAName = _firstBuildReference._build.LogFilePath;
+            difference.binlogBName = _secondBuildReference._build.LogFilePath;
 
             FindDifferences();
         }
@@ -196,7 +199,7 @@ namespace StructuredLogger.BinaryLogger
 
             // First, find all of the properties 
             var firstBinlogProperties = ExecuteSearch(_firstBuildReference._build, grabAllPropertiesQuery);
-            var secondBinlogProperties = ExecuteSearch(_firstBuildReference._build, grabAllPropertiesQuery);
+            var secondBinlogProperties = ExecuteSearch(_secondBuildReference._build, grabAllPropertiesQuery);
 
             // Next, map the properties to their respective projects or environment
             foreach(var property in firstBinlogProperties)
@@ -205,14 +208,14 @@ namespace StructuredLogger.BinaryLogger
             }
             foreach (var property in secondBinlogProperties)
             {
-                PopulateBuildWithPropertyInfo(_firstBuildReference, property);
+                PopulateBuildWithPropertyInfo(_secondBuildReference, property);
             }
 
             // Finally, collect the diff. you can erase proprety from the dictionary if same, else add it to diff class. anything remaining in the other dictionary will be a diff also.
             // everything not in the diff would be the same after.
 
             ParsePropertyDifference(_firstBuildReference.Environment, _secondBuildReference.Environment, difference.environmentDifference);
-            ParseProjectPropertyDifference(false);
+            //ParseProjectPropertyDifference(false);
             ParseProjectPropertyDifference(true);
         }
 
