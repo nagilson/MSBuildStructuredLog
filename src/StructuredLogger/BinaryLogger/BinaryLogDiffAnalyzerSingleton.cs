@@ -17,7 +17,6 @@ namespace StructuredLogger.BinaryLogger
             public Build _build;
             public Dictionary<Project, ProjectProperties> Projects = new Dictionary<Project, ProjectProperties>(new ProjectComparer());
             public Dictionary<string, string> Environment = new Dictionary<string, string>();
-            public Dictionary<string, string> Globals = new Dictionary<string, string>();
 
             public DiffableBuild(Build build)
             {
@@ -28,6 +27,7 @@ namespace StructuredLogger.BinaryLogger
         private struct ProjectProperties
         {
             public Dictionary<string, string> Properties = new Dictionary<string, string>();
+            public Dictionary<string, string> Globals = new Dictionary<string, string>();
 
             public ProjectProperties()
             {
@@ -41,23 +41,25 @@ namespace StructuredLogger.BinaryLogger
         private struct ProjectComparer : IEqualityComparer<Project>
         {
 
-            private bool _UseProjectPathsOverNamesToIdentifier;
+            private bool _UseProjectPathsOverNamesToIdentify; // probably get rid of this
 
             public ProjectComparer(bool useProjectPathsOverNamesToIdentifier = false)
             {
-                _UseProjectPathsOverNamesToIdentifier = useProjectPathsOverNamesToIdentifier;
-                // TODO: intelligent logic for _USEPPONTI
+                _UseProjectPathsOverNamesToIdentify = useProjectPathsOverNamesToIdentifier;
+            }
+
+            private bool AreEquivalentDictionariesAssumingKVImplementComparator<K, V>(IDictionary<K, V> dict1, IDictionary<K, V> dict2)
+            {
+                return dict1.Count == dict2.Count && !dict1.Except(dict2).Any();
             }
 
             public bool Equals(Project x, Project y) // This compares projects across machines/binlogs, must be ID agnostic
             {
                 if (x.Name == y.Name)
                 {
-                    if (x.TargetsText == y.TargetsText)
-                    {
-                        if (x.GlobalProperties == y.GlobalProperties)
+                        if (AreEquivalentDictionariesAssumingKVImplementComparator<string, string>(x.GlobalProperties, y.GlobalProperties))
                         {
-                            if (_UseProjectPathsOverNamesToIdentifier)
+                            if (_UseProjectPathsOverNamesToIdentify)
                             {
                                 return x.ProjectFile == y.ProjectFile;
                             }
@@ -66,28 +68,26 @@ namespace StructuredLogger.BinaryLogger
                                 return true;
                             }
                         }
-                    }
                 }
                 return false;
             }
 
             public int GetHashCode(Project obj)
             {
-                if (!_UseProjectPathsOverNamesToIdentifier)
+                if (!_UseProjectPathsOverNamesToIdentify)
                 {
-                    return $"{obj.Name + obj.TargetsText}".GetHashCode();
+                    return $"{obj.Name + obj.GlobalProperties.Count()}".GetHashCode();
                 }
                 else
                 {
-                    return $"{obj.ProjectDirectory + obj.Name + obj.TargetsText}".GetHashCode();
+                    return $"{obj.ProjectDirectory + obj.Name + obj.GlobalProperties.Count()}".GetHashCode();
                 }
             }
         }
 
         public struct BuildDifference
         {
-            public List<Difference<Tuple<string, string>>> globalDifference;
-            public List<Difference<Tuple<string, string>>> environmentDifference;
+            public List<Difference<Tuple<string, string>>> environmentDifference = new();
             public string binlogAName;
             public string binlogBName;
             public Dictionary<Project, ProjectDifference> projectDifferences = new Dictionary<Project, ProjectDifference>(new ProjectComparer());
@@ -99,7 +99,9 @@ namespace StructuredLogger.BinaryLogger
 
         public struct ProjectDifference
         {
-            public List<Difference<Tuple<string, string>>> propertyDifference = new List<Difference<Tuple<string, string>>>();
+            public List<Difference<Tuple<string, string>>> propertyDifference = new();
+            public List<Difference<Tuple<string, string>>> globalDifference = new(); // This is currently useless because globalproperties are used to ID projects. They will show up as distinct projects with a _soleOwner if differences exist.
+
             public string _soleOwner;
 
             public ProjectDifference()
@@ -163,17 +165,19 @@ namespace StructuredLogger.BinaryLogger
             while(projectsToVisit.Any())
             {
                 var projectToVisit = projectsToVisit.Pop();
-                buildProjectStore.Projects.Add(projectToVisit, new ProjectProperties());
+                buildProjectStore.Projects[projectToVisit] = new ProjectProperties();
                 visitedProjectIds.Add(projectToVisit.EvaluationId);
                 ProjectEvaluation projectData = buildProjectStore._build.FindEvaluation(projectToVisit.EvaluationId);
-                var dispatchToInnerBuildNode = projectToVisit.FindFirstChild<NamedNode>(n => n.Name == "DispatchToInnerBuilds");
-                var MSBuildTask = dispatchToInnerBuildNode?.FindFirstChild<NamedNode>(n => n.Name == "MSBuild");
-                var discoveredProjects = MSBuildTask?.Children.OfType<Project>().ToList();
-                foreach (var project in discoveredProjects == null ? new List<Project>() : discoveredProjects)
+                var MSBuildTasks = projectToVisit.FindChildrenRecursive<NamedNode>(n => n.Name == "MSBuild" && n.TypeName == "Task");
+                foreach (var msbuildInvoke in MSBuildTasks)
                 {
-                    if (!visitedProjectIds.Contains(project.EvaluationId))
+                    var discoveredProjects = msbuildInvoke.Children.OfType<Project>().ToList();
+                    foreach (var project in discoveredProjects == null ? new List<Project>() : discoveredProjects)
                     {
-                        projectsToVisit.Push(project);
+                        if (!visitedProjectIds.Contains(project.EvaluationId) && !projectsToVisit.Any(p => p.EvaluationId == project.EvaluationId))
+                        {
+                            projectsToVisit.Push(project);
+                        }
                     }
                 }
             }
@@ -208,11 +212,11 @@ namespace StructuredLogger.BinaryLogger
             // everything not in the diff would be the same after.
 
             ParsePropertyDifference(_firstBuildReference.Environment, _secondBuildReference.Environment, difference.environmentDifference);
-            ParsePropertyDifference(_firstBuildReference.Globals, _secondBuildReference.Globals, difference.globalDifference);
-            ParseProjectPropertyDifference();
+            ParseProjectPropertyDifference(false);
+            ParseProjectPropertyDifference(true);
         }
 
-        void ParseProjectPropertyDifference()
+        void ParseProjectPropertyDifference(bool parseLocalProperties)
         {
             foreach (var kvp in _firstBuildReference.Projects)
             {
@@ -222,11 +226,16 @@ namespace StructuredLogger.BinaryLogger
                 if ( _secondBuildReference.Projects.TryGetValue(projectReference, out otherProjectProperties))
                 {
                     difference.projectDifferences[projectReference] = new ProjectDifference();
-                    ParsePropertyDifference(projectProperties.Properties, otherProjectProperties.Properties, difference.projectDifferences[projectReference].propertyDifference);
+                    ParsePropertyDifference(
+                        parseLocalProperties ? projectProperties.Properties : projectProperties.Globals,
+                        parseLocalProperties ? otherProjectProperties.Properties : otherProjectProperties.Globals,
+                        parseLocalProperties ? difference.projectDifferences[projectReference].propertyDifference : difference.projectDifferences[projectReference].globalDifference
+                    );
                     _secondBuildReference.Projects.Remove(projectReference); // Remove this so we can scan faster for Project B.
                 }
                 else // The project doesn't exist in the other binlog.
                 {
+                    // Create a project difference with empty lists indicating with binlog owns it.
                     difference.projectDifferences[projectReference] = new ProjectDifference(_firstBuildReference._build.Name);
                 }
             }
@@ -234,7 +243,7 @@ namespace StructuredLogger.BinaryLogger
             foreach(var kvp in _secondBuildReference.Projects)
             {
                 // All of the remaining projects were only in B because they were removed if they were in A.
-                difference.projectDifferences.Add(kvp.Key, new ProjectDifference(_secondBuildReference._build.Name));
+                difference.projectDifferences[kvp.Key] = new ProjectDifference(_secondBuildReference._build.Name);
             }
         }
 
@@ -302,19 +311,36 @@ namespace StructuredLogger.BinaryLogger
                         {
                             return;
                         }
-                        build.Projects[ghostProject].Properties.Add(propertyNode.Name, propertyNode.Value);
+                        build.Projects[ghostProject].Properties[propertyNode.Name] = propertyNode.Value;
                         return;
                     }
                     else if(namedNode.Name == "Environment")
                     {
                         var propertyNode = (Property)propertyResult.Node;
-                        build.Environment.Add(propertyNode.Name, propertyNode.Value);
+                        build.Environment[propertyNode.Name] = propertyNode.Value;
                         return;
                     }
                     else if (namedNode.Name == "Global")
                     {
                         var propertyNode = (Property)propertyResult.Node;
-                        build.Globals.Add(propertyNode.Name, propertyNode.Value);
+                        ProjectEvaluation projectEvalOwner = iterParentNode.GetNearestParent<ProjectEvaluation>();
+                        if (projectEvalOwner != null) // Global properties can be owned by a "Project" Node or a "ProjectEvaluation" Node
+                        {
+                            var ghostProject = GhostProject(build, projectEvalOwner);
+                            if (ghostProject == null)
+                            {
+                                return;
+                            }
+                            build.Projects[ghostProject].Globals[propertyNode.Name] = propertyNode.Value;
+                        }
+                        else // The global property belongs to a Project node. (Did it not get evaluated due to msbuild error, or maybe this is a distinct node?)
+                        {
+                            Project projectOwner = iterParentNode.GetNearestParent<Project>();
+                            if(projectOwner != null)
+                            {
+                                build.Projects[projectOwner].Globals[propertyNode.Name] = propertyNode.Value;
+                            }
+                        }
                         return;
                     }
                 }
