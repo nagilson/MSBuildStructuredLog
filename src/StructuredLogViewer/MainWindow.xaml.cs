@@ -12,7 +12,7 @@ using System.Windows.Threading;
 using Microsoft.Build.Logging.StructuredLogger;
 using Microsoft.Win32;
 using Squirrel;
-using StructuredLogger.BinaryLogger;
+using StructuredLogger.Analyzers;
 using StructuredLogViewer.Controls;
 
 namespace StructuredLogViewer
@@ -23,7 +23,7 @@ namespace StructuredLogViewer
         private string projectFilePath;
         private BuildControl currentBuild;
         private List<Build> buildsForDiff = new List<Build>();
-        private BinaryLogDiffAnalyzer _differ;
+        private DiffModel _differ;
         private string lastSearchText;
         private double scale = 1.0;
 
@@ -553,7 +553,7 @@ namespace StructuredLogViewer
         {
             await LoadBinlog(binlogA);
             await LoadBinlog(binlogB);
-            _differ = new BinaryLogDiffAnalyzer(buildsForDiff);
+            _differ = new DiffModel(buildsForDiff);
             buildsForDiff.Clear();
         }
 
