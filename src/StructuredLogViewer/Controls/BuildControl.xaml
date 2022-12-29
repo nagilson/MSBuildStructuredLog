@@ -1,4 +1,4 @@
-﻿<UserControl x:Class="StructuredLogViewer.Controls.BuildControl"
+<UserControl x:Class="StructuredLogViewer.Controls.BuildControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -84,6 +84,15 @@
                     <local:TracingControl x:Name="tracing"
                                            Visibility="Hidden"
                                            structuredLogViewer:ScrollViewerHelper.ShiftWheelScrollsHorizontally="True" />
+                  </Grid>
+                </TabItem>
+
+                <TabItem x:Name="diffTab" Header="Diff">
+                  <Grid>
+                    <TextBlock x:Name="diffWatermark" HorizontalAlignment="Center"
+                               VerticalAlignment="Center">Rendering Diff... (if diff selected from main menu.)</TextBlock>
+                    <local:DiffControl x:Name="diffing"
+                                       Visibility="Hidden" />
                   </Grid>
                 </TabItem>
 

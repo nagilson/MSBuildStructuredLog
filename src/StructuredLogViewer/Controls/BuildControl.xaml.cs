@@ -319,6 +319,10 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
             {
                 PopulateTrace();
             }
+            else if (selectedItem.Name == nameof(diffTab))
+            {
+                PopulateDiff();
+            }
         }
 
         private void FilesTree_SearchTextChanged(string text)
@@ -411,6 +415,14 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
                 this.tracing.SetTimeline(timeline, Build.StartTime.Ticks, Build.EndTime.Ticks);
                 this.tracingWatermark.Visibility = Visibility.Hidden;
                 this.tracing.Visibility = Visibility.Visible;
+            }
+        }
+
+        private void PopulateDiff()
+        {
+            if(this.diffing == null)
+            {
+
             }
         }
 
