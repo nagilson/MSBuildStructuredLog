@@ -85,6 +85,35 @@ namespace StructuredLogger.BinaryLogger
             }
         }
 
+        private struct TaskComparer : IEqualityComparer<Task>
+        {
+            public TaskComparer(bool useProjectPathsOverNamesToIdentifier = false)
+            {
+            }
+
+            public bool Equals(Task x, Task y) // This compares projects across machines/binlogs, must be ID agnostic
+            {
+                if (x.Name == y.Name)
+                {
+                    if (((Target)x.Parent).Name == ((Target)y.Parent).Name)
+                    {
+                        var xGlobals = x.FindChild<NamedNode>(n => n.Name == "Global Properties");
+                        var yGlobals = y.FindChild<NamedNode>(n => n.Name == "Global Properties");
+                        if(xGlobals == yGlobals)
+                        {
+                            return true;
+                        }    
+                    }
+                }
+                return false;
+            }
+
+            public int GetHashCode(Task obj)
+            {
+                return $"{obj.Name}".GetHashCode();
+            }
+        }
+
         public struct BuildDifference
         {
             public List<Difference<Tuple<string, string>>> environmentDifference = new();
@@ -389,8 +418,22 @@ namespace StructuredLogger.BinaryLogger
 
         void CollectTaskDiff()
         {
+            foreach (var kvp in _firstBuildReference.Projects)
+            {
+                Project projectReference = kvp.Key;
+                if (_secondBuildReference.Projects.ContainsKey(projectReference))
+                {
+                    Project twinProject = _secondBuildReference.Projects.Keys.Where(k => new ProjectComparer().Equals(k, projectReference)).First();
 
+                    var AllTasks = projectReference.FindChildrenRecursive<Task>();
+                    foreach (var task in AllTasks)
+                    {
+                        var twinTask = twinProject.FindChild<Task>(t => new TaskComparer().Equals(t, task));
+                    }
+                }
+            }
         }
+
 
     }
 }
