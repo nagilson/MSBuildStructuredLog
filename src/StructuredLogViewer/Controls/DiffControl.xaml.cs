@@ -7,16 +7,22 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using DiffPlex.WindowsForms.Controls;
+using DiffPlex.Wpf.Controls;
 using Microsoft.Build.Logging.StructuredLogger;
+
 
 namespace StructuredLogViewer.Controls
 {
     public partial class DiffControl : UserControl
     {
 
+        private SideBySideDiffViewer differ;
+
         public DiffControl()
         {
             this.DataContext = this;
+            differ = new SideBySideDiffViewer();
             InitializeComponent();
             ComputeAndDraw();
         }
@@ -30,7 +36,8 @@ namespace StructuredLogViewer.Controls
 
         private void Draw()
         {
-           
+            diffView.OldText = "old";
+            diffView.NewText = "new";
         }
     }
 }
