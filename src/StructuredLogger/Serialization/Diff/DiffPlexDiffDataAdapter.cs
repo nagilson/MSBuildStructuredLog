@@ -5,16 +5,22 @@ using static StructuredLogger.Analyzers.DiffModel;
 
 namespace StructuredLogger.Serialization.Diff
 {
-    internal class DiffPlexDiffDataAdapter : BinlogDiffDataAdapter<BuildDifference, string>
+    internal class DiffPlexDiffDataAdapter : BinlogDiffDataAdapter<BuildDifference, List<string>>
     {
         DiffPlexDiffDataAdapter()
         {
             filter = new LinchpinHeuristicDiffFilter();
         }
 
-        public override string Adapt(BuildDifference buildDifference)
+        public override List<string> Adapt(BuildDifference buildDifference)
         {
-            throw new NotImplementedException();
+            List<string> diffWindows = new();
+            string f = "f";
+            if ( Include(f) )
+            {
+
+            }
+            return diffWindows;
         }
     }
 }

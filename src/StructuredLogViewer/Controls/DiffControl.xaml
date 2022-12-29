@@ -7,7 +7,20 @@
              xmlns:local="clr-namespace:StructuredLogViewer.Controls"
              mc:Ignorable="d" 
              d:DesignHeight="300" d:DesignWidth="300">
-    <Grid Background="Transparent">
-        <diffplex:DiffViewer x:Name="diffView" />
+
+    <UserControl.Resources>
+        <DataTemplate x:Key="MyDataTemplate" DataType="{x:Type diffplex:DiffViewer}">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Stretch">
+            </StackPanel>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Grid>
+        <!-- <DataGrid
+                x:Name="diffsView"
+                ItemTemplate="{StaticResource MyDataTemplate}"
+                ItemsSource="{Binding Path=DifferencesViewers, Mode=OneWay}">
+        </DataGrid> -->
+        <diffplex:DiffViewer x:Name="soloDiff"></diffplex:DiffViewer>
     </Grid>
 </UserControl>

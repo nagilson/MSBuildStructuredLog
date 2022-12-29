@@ -1,13 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
-using DiffPlex.WindowsForms.Controls;
+using DiffPlex.DiffBuilder;
 using DiffPlex.Wpf.Controls;
 using Microsoft.Build.Logging.StructuredLogger;
 
@@ -16,14 +18,13 @@ namespace StructuredLogViewer.Controls
 {
     public partial class DiffControl : UserControl
     {
-
-        private SideBySideDiffViewer differ;
+        public ObservableCollection<SideBySideDiffViewer> DifferencesViewers { get; set; }
 
         public DiffControl()
         {
-            this.DataContext = this;
-            differ = new SideBySideDiffViewer();
+            this.DifferencesViewers = new ObservableCollection<SideBySideDiffViewer>();
             InitializeComponent();
+            this.DataContext = this;
             ComputeAndDraw();
         }
 
@@ -36,8 +37,16 @@ namespace StructuredLogViewer.Controls
 
         private void Draw()
         {
-            diffView.OldText = "old";
-            diffView.NewText = "new";
+
+            soloDiff.OldText = "old";
+            soloDiff.NewText = "new";
+
+            DiffPlex.Wpf.Controls.SideBySideDiffViewer differ = new SideBySideDiffViewer();
+            differ.SetDiffModel("old", "new");
+            DifferencesViewers.Add(differ);
+            DifferencesViewers.Add(differ);
+
+            Console.WriteLine("");
         }
     }
 }
