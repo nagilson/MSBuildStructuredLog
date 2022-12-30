@@ -427,10 +427,13 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
 
         private void PopulateDiff()
         {
-            this.diffing.BuildControl = this;
-            this.diffWatermark.Visibility = Visibility.Hidden;
-            this.diffing.Visibility = Visibility.Visible;
-            this.diffing.PopulateDiff(diffModel.difference.binlogAName, diffModel.difference.binlogBName, new DiffPlexDiffDataAdapter().Adapt(diffModel.difference));
+            if (this.diffModel != null)
+            {
+                this.diffing.BuildControl = this;
+                this.diffWatermark.Visibility = Visibility.Hidden;
+                this.diffing.Visibility = Visibility.Visible;
+                this.diffing.PopulateDiff(diffModel.difference.binlogAName, diffModel.difference.binlogBName, new DiffPlexDiffDataAdapter().Adapt(diffModel.difference));
+            }
         }
 
         private Microsoft.Msagl.Drawing.Graph graph;

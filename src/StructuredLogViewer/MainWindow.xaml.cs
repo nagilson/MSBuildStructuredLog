@@ -556,6 +556,7 @@ namespace StructuredLogViewer
             await LoadBinlog(binlogB);
             _differ = new DiffModel(buildsForDiff);
             DisplayBuild(buildsForDiff.First(), _differ);
+            currentBuild.GoToDiff(); // TODO: this currently doesn't set you to the tab automatically
             buildsForDiff.Clear();
         }
 

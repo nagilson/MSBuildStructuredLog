@@ -90,7 +90,8 @@
                 <TabItem x:Name="diffTab" Header="Diff">
                   <Grid>
                     <TextBlock x:Name="diffWatermark" HorizontalAlignment="Center"
-                               VerticalAlignment="Center">Rendering Diff... (if diff selected from main menu.)</TextBlock>
+                               VerticalAlignment="Center">Rendering Diff...
+                     [You must select File -> Diff ... to load a diff.]</TextBlock>
                     <local:DiffControl x:Name="diffing"
                                        Visibility="Hidden" />
                   </Grid>
