@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Windows;
 using System.Windows.Controls;
@@ -12,7 +13,7 @@ using System.Windows.Threading;
 using Microsoft.Build.Logging.StructuredLogger;
 using Microsoft.Win32;
 using Squirrel;
-using StructuredLogger.Analyzers;
+using StructuredLogger.Analyzers.Diff;
 using StructuredLogViewer.Controls;
 
 namespace StructuredLogViewer
@@ -554,6 +555,7 @@ namespace StructuredLogViewer
             await LoadBinlog(binlogA);
             await LoadBinlog(binlogB);
             _differ = new DiffModel(buildsForDiff);
+            DisplayBuild(buildsForDiff.First(), _differ);
             buildsForDiff.Clear();
         }
 
@@ -626,9 +628,9 @@ namespace StructuredLogViewer
             }
         }
 
-        private void DisplayBuild(Build build)
+        private void DisplayBuild(Build build, DiffModel diff = null)
         {
-            currentBuild = build != null ? new BuildControl(build, logFilePath) : null;
+            currentBuild = build != null ? new BuildControl(build, logFilePath, diff) : null;
             SetContent(currentBuild);
 
             if (currentBuild == null)

@@ -19,6 +19,7 @@ using Microsoft.Build.Framework;
 using Microsoft.Build.Logging.StructuredLogger;
 using Microsoft.Language.Xml;
 using Mono.Cecil;
+using StructuredLogger.Analyzers.Diff;
 using StructuredLogViewer.Core.ProjectGraph;
 
 namespace StructuredLogViewer.Controls
@@ -35,6 +36,7 @@ namespace StructuredLogViewer.Controls
         private ArchiveFileResolver archiveFile => sourceFileResolver.ArchiveFile;
         private PreprocessedFileManager preprocessedFileManager;
         private NavigationHelper navigationHelper;
+        private DiffModel diffModel;
 
         private MenuItem copyItem;
         private MenuItem copySubtreeItem;
@@ -64,7 +66,7 @@ namespace StructuredLogViewer.Controls
 
         private PropertiesAndItemsSearch propertiesAndItemsSearch;
 
-        public BuildControl(Build build, string logFilePath)
+        public BuildControl(Build build, string logFilePath, DiffModel diff = null)
         {
             InitializeComponent();
 
@@ -123,6 +125,7 @@ namespace StructuredLogViewer.Controls
 
             DataContext = build;
             Build = build;
+            diffModel = diff;
 
             if (build.SourceFilesArchive != null)
             {
@@ -427,6 +430,7 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
             this.diffing.BuildControl = this;
             this.diffWatermark.Visibility = Visibility.Hidden;
             this.diffing.Visibility = Visibility.Visible;
+            this.diffing.PopulateDiff(diffModel.difference.binlogAName, diffModel.difference.binlogBName, new DiffPlexDiffDataAdapter().Adapt(diffModel.difference));
         }
 
         private Microsoft.Msagl.Drawing.Graph graph;
@@ -1385,7 +1389,6 @@ Recent:
             if (treeNode != null)
             {
                 centralTabControl.SelectedIndex = 3;
-                //this.diffing.GoToTimedNode(treeNode);
             }
         }
 

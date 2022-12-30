@@ -6,9 +6,9 @@ using System.Text;
 using System.Threading;
 using Microsoft.Build.Logging.StructuredLogger;
 using StructuredLogViewer;
-using static StructuredLogger.Analyzers.DiffModel;
+using static StructuredLogger.Analyzers.Diff.DiffModel;
 
-namespace StructuredLogger.Analyzers
+namespace StructuredLogger.Analyzers.Diff
 {
     public class DiffModel
     {
@@ -269,7 +269,7 @@ namespace StructuredLogger.Analyzers
                 else // The project doesn't exist in the other binlog.
                 {
                     // Create a project difference with empty lists indicating with binlog owns it.
-                    difference.projectDifferences[projectReference] = new ProjectDifference(_firstBuildReference._build.Name);
+                    difference.projectDifferences[projectReference] = new ProjectDifference(_firstBuildReference._build.LogFilePath);
                 }
             }
 
@@ -277,7 +277,7 @@ namespace StructuredLogger.Analyzers
             {
                 if (!difference.projectDifferences.ContainsKey(kvp.Key))
                 {
-                    difference.projectDifferences[kvp.Key] = new ProjectDifference(_secondBuildReference._build.Name);
+                    difference.projectDifferences[kvp.Key] = new ProjectDifference(_secondBuildReference._build.LogFilePath);
                 }
             }
         }

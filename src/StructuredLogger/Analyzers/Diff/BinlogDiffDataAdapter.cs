@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace StructuredLogger.Serialization.Diff
+namespace StructuredLogger.Analyzers.Diff
 {
-    internal abstract class BinlogDiffDataAdapter<BuildDifference, T>
+    public abstract class BinlogDiffDataAdapter<BuildDifference, T>
     {
         internal IDiffFilter filter;
         public bool useFilter = true;

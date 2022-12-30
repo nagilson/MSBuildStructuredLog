@@ -29,7 +29,18 @@ namespace StructuredLogViewer.Controls
         }
 
         public BuildControl BuildControl { get; set; }
-        
+
+        public void PopulateDiff(string binlogA, string binlogB, List<Tuple<string, string>> diffs)
+        {
+            // TODO: make this work for multiple project diffs, consider if no diff exists.
+            var oneDiff = diffs.First();
+
+            soloDiff.OldTextHeader = binlogA;
+            soloDiff.NewTextHeader = binlogB;
+            soloDiff.OldText = oneDiff.Item1;
+            soloDiff.NewText = oneDiff.Item2;
+        }
+
         private void ComputeAndDraw()
         {
             Draw();
@@ -37,10 +48,6 @@ namespace StructuredLogViewer.Controls
 
         private void Draw()
         {
-
-            soloDiff.OldText = "old";
-            soloDiff.NewText = "new";
-
             DiffPlex.Wpf.Controls.SideBySideDiffViewer differ = new SideBySideDiffViewer();
             differ.SetDiffModel("old", "new");
             DifferencesViewers.Add(differ);
