@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 
 namespace StructuredLogger.Analyzers.Diff
 {
-    internal class LinchpinHeuristicDiffFilter : IDiffFilter
+    internal class LinchpinHeuristicDiffFilter : DiffFilter
     {
         private Dictionary<string, string> unimportantProperties = new Dictionary<string, string>
         {
@@ -37,12 +38,36 @@ namespace StructuredLogger.Analyzers.Diff
             { "", "" }
         };
 
+        private Dictionary<string, bool> cachedLooksLikePathValues = new Dictionary<string, bool>();
+
         private bool LooksLikeAPath(string potentialPath)
         {
-            return Uri.IsWellFormedUriString(potentialPath, UriKind.RelativeOrAbsolute);
+            if (cachedLooksLikePathValues.ContainsKey(potentialPath))
+            {
+                return cachedLooksLikePathValues[potentialPath];
+            }
+
+            FileInfo fileValidityTester = null;
+            try
+            {
+                fileValidityTester = new(potentialPath);
+            }
+            catch (ArgumentException) { }
+            catch (PathTooLongException) { }
+            catch (NotSupportedException) { }
+            if (ReferenceEquals(fileValidityTester, null))
+            {
+                cachedLooksLikePathValues.Add(potentialPath, false);
+                return false;
+            }
+            else
+            {
+                cachedLooksLikePathValues.Add(potentialPath, true);
+                return true;
+            }
         }
 
-        public bool ShouldIncludeInDiff<T>(T item)
+        public override bool ShouldIncludeInDiff<T>(T item)
         {
             return true;
         }
@@ -54,6 +79,11 @@ namespace StructuredLogger.Analyzers.Diff
 
         public bool ShouldIncludeInDiff(Tuple<string, string> propertySet)
         {
+            if (!useFilter)
+            {
+                return true;
+            }
+
             if (propertySet == null)
             {
                 return false;

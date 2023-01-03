@@ -7,6 +7,7 @@ namespace StructuredLogger.Analyzers.Diff
 {
     public class DiffPlexDiffDataAdapter : BinlogDiffDataAdapter<BuildDifference, List<Tuple<string, string>>>
     {
+
         public DiffPlexDiffDataAdapter()
         {
             filter = new LinchpinHeuristicDiffFilter();
@@ -70,7 +71,7 @@ namespace StructuredLogger.Analyzers.Diff
             var firstEnvVarValue = d.binlogAValue?.Item2;
             var secondEnvVarVar = d.binlogBValue?.Item2;
 
-            if (Include(d.binlogAValue))
+            if (((LinchpinHeuristicDiffFilter)filter).ShouldIncludeInDiff(d.binlogAValue))
             {
                 stringA.AppendLine($"\t{firstEnvVarKey ?? "*NOT_DEFINED"}");
                 stringA.AppendLine($"\t\t{firstEnvVarValue ?? "*IS_LEGIT_NULL"}");
