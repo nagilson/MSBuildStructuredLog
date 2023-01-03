@@ -30,13 +30,13 @@ namespace StructuredLogger.Analyzers.Diff
 
             // TODO: normally append and reset string builder, but currently only 1 diff can be displayed. For demo, we will show all diffs.
 
-            foreach(var kvp in buildDifference.projectDifferences)
+            foreach (var kvp in buildDifference.projectDifferences)
             {
                 firstEnvironmentDiffFlat.AppendLine(kvp.Key.Name + kvp.Key.EvaluationText);
                 var propertyDifference = kvp.Value.propertyDifference;
-                if(propertyDifference == null)
+                if (propertyDifference == null)
                 {
-                    if(kvp.Value._soleOwner == buildDifference.binlogAName)
+                    if (kvp.Value._soleOwner == buildDifference.binlogAName)
                     {
                         firstEnvironmentDiffFlat.AppendLine("Project Exists.");
                         secondEnvironmentDiffFlat.AppendLine("Project Doesn't Exist.");
@@ -49,7 +49,7 @@ namespace StructuredLogger.Analyzers.Diff
                 }
                 else
                 {
-                    foreach(var propDiff in propertyDifference)
+                    foreach (var propDiff in propertyDifference)
                     {
                         WriteDifference(firstEnvironmentDiffFlat, secondEnvironmentDiffFlat, propDiff);
                     }
@@ -70,7 +70,7 @@ namespace StructuredLogger.Analyzers.Diff
             var firstEnvVarValue = d.binlogAValue?.Item2;
             var secondEnvVarVar = d.binlogBValue?.Item2;
 
-            if (Include(firstEnvVarKey))
+            if (Include(d.binlogAValue))
             {
                 stringA.AppendLine($"\t{firstEnvVarKey ?? "*NOT_DEFINED"}");
                 stringA.AppendLine($"\t\t{firstEnvVarValue ?? "*IS_LEGIT_NULL"}");
