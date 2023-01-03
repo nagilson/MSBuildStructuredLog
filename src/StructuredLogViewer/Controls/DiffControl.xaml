@@ -16,11 +16,11 @@
     </UserControl.Resources>
 
     <Grid>
-        <!-- <DataGrid
+        <DataGrid
                 x:Name="diffsView"
                 ItemTemplate="{StaticResource MyDataTemplate}"
                 ItemsSource="{Binding Path=DifferencesViewers, Mode=OneWay}">
-        </DataGrid> -->
+        </DataGrid>
         <diffplex:DiffViewer x:Name="soloDiff"></diffplex:DiffViewer>
     </Grid>
 </UserControl>
