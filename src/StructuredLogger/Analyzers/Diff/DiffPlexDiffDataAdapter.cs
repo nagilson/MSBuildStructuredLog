@@ -7,9 +7,15 @@ namespace StructuredLogger.Analyzers.Diff
 {
     public class DiffPlexDiffDataAdapter : BinlogDiffDataAdapter<BuildDifference, List<Tuple<string, string>>>
     {
+        private const string undefined = "*undefined*";
+        private const string trueNull = "*null*";
+        private const string environment = "Environment";
+        private const string projectExists = "Project Exists.";
+        private const string projectUnavailable = "Project doesn't exist.";
 
-        public DiffPlexDiffDataAdapter()
+        public DiffPlexDiffDataAdapter(bool useFilter)
         {
+            this.useFilter = useFilter;
             filter = new LinchpinHeuristicDiffFilter();
         }
 
@@ -17,48 +23,57 @@ namespace StructuredLogger.Analyzers.Diff
         {
             List<Tuple<string, string>> diffWindows = new();
 
-            // environment setup
-            StringBuilder firstEnvironmentDiffFlat = new();
-            StringBuilder secondEnvironmentDiffFlat = new();
+            // Environment diffs
 
-            firstEnvironmentDiffFlat.AppendLine("Environment");
-            secondEnvironmentDiffFlat.AppendLine("Environment");
+            StringBuilder flatDiffContentA = new();
+            StringBuilder flatDiffContentB = new();
+
+            flatDiffContentA.AppendLine(environment);
+            flatDiffContentB.AppendLine(environment);
 
             foreach (var kvp in buildDifference.environmentDifference)
             {
-                WriteDifference(firstEnvironmentDiffFlat, secondEnvironmentDiffFlat, kvp);
+                WriteDifference(flatDiffContentA, flatDiffContentB, kvp);
             }
 
-            // TODO: normally append and reset string builder, but currently only 1 diff can be displayed. For demo, we will show all diffs.
+            diffWindows.Add(new Tuple<string, string>(flatDiffContentA.ToString(), flatDiffContentB.ToString()));
+            flatDiffContentA = new();
+            flatDiffContentB = new();
+            GC.Collect();
+
+            // Project diffs
 
             foreach (var kvp in buildDifference.projectDifferences)
             {
-                firstEnvironmentDiffFlat.AppendLine(kvp.Key.Name + kvp.Key.EvaluationText);
+                string projectId = $"{kvp.Key.Name} {kvp.Key.TargetFramework}  {kvp.Key.Configuration}";
+                flatDiffContentA.AppendLine(projectId);
+                flatDiffContentB.AppendLine(projectId);
+
                 var propertyDifference = kvp.Value.propertyDifference;
                 if (propertyDifference == null)
                 {
                     if (kvp.Value._soleOwner == buildDifference.binlogAName)
                     {
-                        firstEnvironmentDiffFlat.AppendLine("Project Exists.");
-                        secondEnvironmentDiffFlat.AppendLine("Project Doesn't Exist.");
+                        flatDiffContentA.AppendLine(projectExists);
+                        flatDiffContentB.AppendLine(projectUnavailable);
                     }
                     else
                     {
-                        firstEnvironmentDiffFlat.AppendLine("Project Doesn't Exist.");
-                        secondEnvironmentDiffFlat.AppendLine("Project Exists.");
+                        flatDiffContentA.AppendLine(projectUnavailable);
+                        flatDiffContentB.AppendLine(projectExists);
                     }
                 }
                 else
                 {
                     foreach (var propDiff in propertyDifference)
                     {
-                        WriteDifference(firstEnvironmentDiffFlat, secondEnvironmentDiffFlat, propDiff);
+                        WriteDifference(flatDiffContentA, flatDiffContentB, propDiff);
                     }
                 }
+                diffWindows.Add(new Tuple<string, string>(flatDiffContentA.ToString(), flatDiffContentB.ToString()));
+                flatDiffContentA = new();
+                flatDiffContentB = new();
             }
-
-            // TODO: again, we need to separate the stringBuilders but not now.
-            diffWindows.Add(new Tuple<string, string>(firstEnvironmentDiffFlat.ToString(), secondEnvironmentDiffFlat.ToString()));
 
             return diffWindows;
         }
@@ -71,13 +86,13 @@ namespace StructuredLogger.Analyzers.Diff
             var firstEnvVarValue = d.binlogAValue?.Item2;
             var secondEnvVarVar = d.binlogBValue?.Item2;
 
-            if (((LinchpinHeuristicDiffFilter)filter).ShouldIncludeInDiff(d.binlogAValue))
+            if (!useFilter || (useFilter && ((LinchpinHeuristicDiffFilter)filter).ShouldIncludeInDiff(d.binlogAValue)))
             {
-                stringA.AppendLine($"\t{firstEnvVarKey ?? "*NOT_DEFINED"}");
-                stringA.AppendLine($"\t\t{firstEnvVarValue ?? "*IS_LEGIT_NULL"}");
+                stringA.AppendLine($"{firstEnvVarKey ?? undefined}");
+                stringA.AppendLine($"\t{firstEnvVarValue ?? trueNull}");
 
-                stringB.AppendLine($"\t{secondEnvVarKey ?? "*NOT_DEFINED"}");
-                stringB.AppendLine($"\t\t{secondEnvVarVar ?? "*IS_LEGIT_NULL"}");
+                stringB.AppendLine($"{secondEnvVarKey ?? undefined}");
+                stringB.AppendLine($"\t{secondEnvVarVar ?? trueNull}");
             }
         }
     }

@@ -38,33 +38,9 @@ namespace StructuredLogger.Analyzers.Diff
             { "", "" }
         };
 
-        private Dictionary<string, bool> cachedLooksLikePathValues = new Dictionary<string, bool>();
-
         private bool LooksLikeAPath(string potentialPath)
         {
-            if (cachedLooksLikePathValues.ContainsKey(potentialPath))
-            {
-                return cachedLooksLikePathValues[potentialPath];
-            }
-
-            FileInfo fileValidityTester = null;
-            try
-            {
-                fileValidityTester = new(potentialPath);
-            }
-            catch (ArgumentException) { }
-            catch (PathTooLongException) { }
-            catch (NotSupportedException) { }
-            if (ReferenceEquals(fileValidityTester, null))
-            {
-                cachedLooksLikePathValues.Add(potentialPath, false);
-                return false;
-            }
-            else
-            {
-                cachedLooksLikePathValues.Add(potentialPath, true);
-                return true;
-            }
+            return potentialPath.Contains("/") || potentialPath.Contains("\\");
         }
 
         public override bool ShouldIncludeInDiff<T>(T item)
@@ -79,11 +55,6 @@ namespace StructuredLogger.Analyzers.Diff
 
         public bool ShouldIncludeInDiff(Tuple<string, string> propertySet)
         {
-            if (!useFilter)
-            {
-                return true;
-            }
-
             if (propertySet == null)
             {
                 return false;
@@ -92,12 +63,7 @@ namespace StructuredLogger.Analyzers.Diff
             var propName = propertySet.Item1;
             var propValue = propertySet.Item2;
 
-            if (unimportantProperties.ContainsKey(propName))
-            {
-                return false;
-            }
-
-            if (LooksLikeAPath(propValue))
+            if (unimportantProperties.ContainsKey(propName) || LooksLikeAPath(propValue))
             {
                 return false;
             }

@@ -432,7 +432,7 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
                 this.diffing.BuildControl = this;
                 this.diffWatermark.Visibility = Visibility.Hidden;
                 this.diffing.Visibility = Visibility.Visible;
-                this.diffing.PopulateDiff(diffModel.difference.binlogAName, diffModel.difference.binlogBName, new DiffPlexDiffDataAdapter().Adapt(diffModel.difference));
+                this.diffing.PopulateDiff(diffModel, new DiffPlexDiffDataAdapter(true).Adapt(diffModel.difference));
             }
         }
 
@@ -1205,7 +1205,7 @@ Recent:
 
             var items = selectedItem.EnumerateSiblingsCycle();
 
-        search:
+search:
             foreach (var item in items)
             {
                 var text = GetText(item);
@@ -1297,7 +1297,7 @@ Recent:
                 CopyToClipboard(text);
             }
         }
-        
+
         public void ViewSubtreeText()
         {
             if (treeView.SelectedItem is BaseNode treeNode)
