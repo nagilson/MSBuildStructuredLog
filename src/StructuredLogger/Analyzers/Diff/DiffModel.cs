@@ -12,6 +12,9 @@ namespace StructuredLogger.Analyzers.Diff
 {
     public class DiffModel
     {
+        /// <summary>
+        /// Similar to the Build class, but with dictionaries so differences can be efficiently computed. 
+        /// </summary>
         private struct DiffableBuild
         {
             public Build _build;
@@ -34,9 +37,10 @@ namespace StructuredLogger.Analyzers.Diff
             }
         }
 
+
         /// <summary>
-        ///  If there are 2+ projects with the same name, we can use the path.
-        /// We don't want to avoid diffing two projects just because their path is different unless necessary.
+        /// Used to compare projects across binlogs, which may not have the same ID but will technically be the same.
+        /// It is a best effort approach to find a match based on project name and global properties.
         /// </summary>
         private struct ProjectComparer : IEqualityComparer<Project>
         {
@@ -85,6 +89,10 @@ namespace StructuredLogger.Analyzers.Diff
             }
         }
 
+        /// <summary>
+        /// Used to ID tasks across different binlogs where the ID might not be the same despite the task call being the same.
+        /// A best effort approach.
+        /// </summary>
         private struct TaskComparer : IEqualityComparer<Task>
         {
             public TaskComparer(bool useProjectPathsOverNamesToIdentifier = false)
@@ -114,6 +122,9 @@ namespace StructuredLogger.Analyzers.Diff
             }
         }
 
+        /// <summary>
+        /// The over-arching data storage mechanism containing all of the diff information.
+        /// </summary>
         public struct BuildDifference
         {
             public List<Difference<Tuple<string, string>>> environmentDifference = new();
@@ -126,6 +137,9 @@ namespace StructuredLogger.Analyzers.Diff
             }
         }
 
+        /// <summary>
+        /// Stores the property differences and (soon) target differences between projects.
+        /// </summary>
         public struct ProjectDifference
         {
             public List<Difference<Tuple<string, string>>> propertyDifference = new();
@@ -145,6 +159,10 @@ namespace StructuredLogger.Analyzers.Diff
             }
         }
 
+        /// <summary>
+        /// A wrapper that stores the same data from one binlog and another that is different across the two. The members may be null if undefined or null in the other binlog. 
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
         public struct Difference<T>
         {
             public T binlogAValue;
@@ -162,6 +180,10 @@ namespace StructuredLogger.Analyzers.Diff
         private DiffableBuild _secondBuildReference;
         public BuildDifference difference = new BuildDifference();
 
+        /// <summary>
+        /// Analyzes a set of two builds and puts their differences into a searchable data type of BuildDifference.
+        /// </summary>
+        /// <param name="buildsForDiff">A list containing two builds to diff in arbitrary order.</param>
         public DiffModel(List<Build> buildsForDiff)
         {
             Debug.Assert(buildsForDiff != null);
@@ -182,6 +204,10 @@ namespace StructuredLogger.Analyzers.Diff
             FindDifferences();
         }
 
+        /// <summary>
+        /// Finds all of the projects from a binlog using a Depth First Search of MSBuild Tasks.
+        /// </summary>
+        /// <param name="buildProjectStore">The build object to put the discovered projects into for later work.</param>
         void DiscoverAllProjects(DiffableBuild buildProjectStore)
         {
             var topLevelProjects = buildProjectStore._build.Children.OfType<Project>();
@@ -214,6 +240,9 @@ namespace StructuredLogger.Analyzers.Diff
             }
         }
 
+        /// <summary>
+        /// Invokes all of the collection functions for different types of differences.
+        /// </summary>
         void FindDifferences()
         {
             CollectPropertyAndEnvironmentDiff();
@@ -239,9 +268,7 @@ namespace StructuredLogger.Analyzers.Diff
                 PopulateBuildWithPropertyInfo(_secondBuildReference, property);
             }
 
-            // Finally, collect the diff. you can erase proprety from the dictionary if same, else add it to diff class. anything remaining in the other dictionary will be a diff also.
-            // everything not in the diff would be the same after.
-
+            // Finally, collect the diff
             ParsePropertyDifference(_firstBuildReference.Environment, _secondBuildReference.Environment, difference.environmentDifference);
             ParseProjectPropertyDifference(false);
             ParseProjectPropertyDifference(true);
@@ -388,6 +415,12 @@ namespace StructuredLogger.Analyzers.Diff
             return;
         }
 
+        /// <summary>
+        /// Return a reference to an existing project class for a given project evaluation based on that evaluation project's ID. 
+        /// </summary>
+        /// <param name="build">The build that should contain the project that was evaluated</param>
+        /// <param name="evaluatedProject">The evaluated project node</param>
+        /// <returns>The project that was evaluated by the evaluated project node.</returns>
         Project GhostProject(DiffableBuild build, ProjectEvaluation evaluatedProject)
         {
             var ghost = build.Projects.Where(proj => proj.Key.EvaluationText == evaluatedProject.EvaluationText).FirstOrDefault().Key;
