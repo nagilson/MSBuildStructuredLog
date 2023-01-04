@@ -445,7 +445,20 @@ namespace StructuredLogger.Analyzers.Diff
 
         void CollectTargetDiff()
         {
+            foreach (var kvp in _firstBuildReference.Projects)
+            {
+                Project projectReference = kvp.Key;
 
+                if (_secondBuildReference.Projects.ContainsKey(projectReference))
+                {
+                    Project twinProject = _secondBuildReference.Projects.Keys.Where(k => new ProjectComparer().Equals(k, projectReference)).First();
+                    var allTargets = projectReference.FindChildrenRecursive<Target>();
+                    foreach (var target in allTargets)
+                    {
+                        Console.WriteLine("");
+                    }
+                }
+            }
         }
 
         void CollectTaskDiff()
