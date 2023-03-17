@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Windows;
 using System.Windows.Controls;
@@ -12,6 +13,7 @@ using System.Windows.Threading;
 using Microsoft.Build.Logging.StructuredLogger;
 using Microsoft.Win32;
 using Squirrel;
+using StructuredLogger.Analyzers.Diff;
 using StructuredLogViewer.Controls;
 
 namespace StructuredLogViewer
@@ -21,6 +23,8 @@ namespace StructuredLogViewer
         private string logFilePath;
         private string projectFilePath;
         private BuildControl currentBuild;
+        private List<Build> buildsForDiff = new List<Build>();
+        private DiffModel _differ;
         private string lastSearchText;
         private double scale = 1.0;
 
@@ -377,7 +381,33 @@ namespace StructuredLogViewer
             OpenLogFile(Convert.ToString(menuItem.Header));
         }
 
-        private async void OpenLogFile(string filePath)
+        private async System.Threading.Tasks.Task<Build> GetBuild(string filePath, Progress progress = null, bool saveBuildForDiff = false)
+        {
+            return await System.Threading.Tasks.Task.Run(() =>
+            {
+                try
+                {
+                    Build build = Serialization.Read(filePath, progress);
+                    if (saveBuildForDiff)
+                    {
+                        buildsForDiff.Add(build);
+                    }
+                    return build;
+                }
+                catch (Exception ex)
+                {
+                    ex = ExceptionHandler.Unwrap(ex);
+                    return GetErrorBuild(filePath, ex.ToString());
+                }
+            });
+        }
+
+        /// <summary>
+        /// Open a log file and begin displaying the binlog on the screen.
+        /// </summary>
+        /// <param name="filePath">The path to the binlog to open.</param>
+        /// <param name="cacheBuildData">This enables storing build information for a diff when multple binlogs need to be saved.</param>
+        private async void OpenLogFile(string filePath, bool cacheBuildData = false)
         {
             if (!File.Exists(filePath))
             {
@@ -405,19 +435,9 @@ namespace StructuredLogViewer
 
             var stopwatch = Stopwatch.StartNew();
 
-            Build build = await System.Threading.Tasks.Task.Run(() =>
-            {
-                try
-                {
-                    return Serialization.Read(filePath, progress.Progress);
-                }
-                catch (Exception ex)
-                {
-                    ex = ExceptionHandler.Unwrap(ex);
-                    shouldAnalyze = false;
-                    return GetErrorBuild(filePath, ex.ToString());
-                }
-            });
+            Build build;
+
+            build = await GetBuild(filePath, progress.Progress);
 
             if (build == null)
             {
@@ -520,12 +540,33 @@ namespace StructuredLogViewer
             OpenLogFile();
         }
 
+        private void Open_Click_Diff(object sender, RoutedEventArgs e)
+        {
+            var firstBinlog = AskUserForBinlog();
+            var secondBinlog = AskUserForBinlog();
+            if (firstBinlog != null && secondBinlog != null)
+            {
+                StartDiffView(firstBinlog, secondBinlog);
+            }
+        }
+
+        private async void StartDiffView(string binlogA, string binlogB)
+        {
+            await LoadBinlog(binlogA);
+            await LoadBinlog(binlogB);
+            _differ = new DiffModel(buildsForDiff);
+            DisplayBuild(buildsForDiff.First(), _differ);
+            currentBuild.GoToDiff(); // TODO: this currently doesn't set you to the tab automatically
+            buildsForDiff.Clear();
+        }
+
+
         private void Build_Click(object sender, RoutedEventArgs e)
         {
             OpenProjectOrSolution();
         }
 
-        private void OpenLogFile()
+        private string AskUserForBinlog()
         {
             var openFileDialog = new OpenFileDialog();
             openFileDialog.Filter = Serialization.OpenFileDialogFilter;
@@ -534,10 +575,27 @@ namespace StructuredLogViewer
             var result = openFileDialog.ShowDialog(this);
             if (result != true)
             {
-                return;
+                return null;
             }
+            else
+            {
+                return openFileDialog.FileName;
+            }
+        }
 
-            OpenLogFile(openFileDialog.FileName);
+        private async System.Threading.Tasks.Task LoadBinlog(string binlogPath)
+        {
+            await GetBuild(binlogPath, null, true);
+        }
+
+        /// <summary>
+        /// Used to open a log file when the user needs to be prompted to select a log file.
+        /// </summary>
+        /// <param name="cacheBuildData">Set this to false normally: the cached data is merely used to store build information for diffs.</param>
+        private void OpenLogFile(bool cacheBuildData = false)
+        {
+            var openFileDialog = AskUserForBinlog();
+            OpenLogFile(openFileDialog);
         }
 
         private void OpenProjectOrSolution()
@@ -571,9 +629,9 @@ namespace StructuredLogViewer
             }
         }
 
-        private void DisplayBuild(Build build)
+        private void DisplayBuild(Build build, DiffModel diff = null)
         {
-            currentBuild = build != null ? new BuildControl(build, logFilePath) : null;
+            currentBuild = build != null ? new BuildControl(build, logFilePath, diff) : null;
             SetContent(currentBuild);
 
             if (currentBuild == null)

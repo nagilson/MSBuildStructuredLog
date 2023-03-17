@@ -131,6 +131,7 @@ namespace StructuredLogViewer
                 }
             }
 
+
             if (Words.Count == 1 &&
                 Words[0].Word is string potentialNodeIndex &&
                 potentialNodeIndex.Length > 1 &&

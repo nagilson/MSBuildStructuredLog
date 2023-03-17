@@ -19,6 +19,7 @@ using Microsoft.Build.Framework;
 using Microsoft.Build.Logging.StructuredLogger;
 using Microsoft.Language.Xml;
 using Mono.Cecil;
+using StructuredLogger.Analyzers.Diff;
 using StructuredLogViewer.Core.ProjectGraph;
 
 namespace StructuredLogViewer.Controls
@@ -35,6 +36,7 @@ namespace StructuredLogViewer.Controls
         private ArchiveFileResolver archiveFile => sourceFileResolver.ArchiveFile;
         private PreprocessedFileManager preprocessedFileManager;
         private NavigationHelper navigationHelper;
+        private DiffModel diffModel;
 
         private MenuItem copyItem;
         private MenuItem copySubtreeItem;
@@ -43,6 +45,7 @@ namespace StructuredLogViewer.Controls
         private MenuItem excludeSubtreeFromSearchItem;
         private MenuItem goToTimeLineItem;
         private MenuItem goToTracingItem;
+        private MenuItem goToDiffItem;
         private MenuItem copyChildrenItem;
         private MenuItem sortChildrenItem;
         private MenuItem copyNameItem;
@@ -63,7 +66,7 @@ namespace StructuredLogViewer.Controls
 
         private PropertiesAndItemsSearch propertiesAndItemsSearch;
 
-        public BuildControl(Build build, string logFilePath)
+        public BuildControl(Build build, string logFilePath, DiffModel diff = null)
         {
             InitializeComponent();
 
@@ -122,6 +125,7 @@ namespace StructuredLogViewer.Controls
 
             DataContext = build;
             Build = build;
+            diffModel = diff;
 
             if (build.SourceFilesArchive != null)
             {
@@ -170,6 +174,7 @@ namespace StructuredLogViewer.Controls
             excludeSubtreeFromSearchItem = new MenuItem() { Header = "Exclude subtree from search" };
             goToTimeLineItem = new MenuItem() { Header = "Go to timeline" };
             goToTracingItem = new MenuItem() { Header = "Go to tracing" };
+            goToDiffItem = new MenuItem() { Header = "Go To diff" };
             copyChildrenItem = new MenuItem() { Header = "Copy children" };
             sortChildrenItem = new MenuItem() { Header = "Sort children" };
             copyNameItem = new MenuItem() { Header = "Copy name" };
@@ -190,6 +195,7 @@ namespace StructuredLogViewer.Controls
             excludeSubtreeFromSearchItem.Click += (s, a) => ExcludeSubtreeFromSearch();
             goToTimeLineItem.Click += (s, a) => GoToTimeLine();
             goToTracingItem.Click += (s, a) => GoToTracing();
+            goToDiffItem.Click += (s, a) => GoToDiff();
             copyChildrenItem.Click += (s, a) => CopyChildren();
             sortChildrenItem.Click += (s, a) => SortChildren();
             copyNameItem.Click += (s, a) => CopyName();
@@ -214,6 +220,7 @@ namespace StructuredLogViewer.Controls
             contextMenu.Items.Add(excludeSubtreeFromSearchItem);
             contextMenu.Items.Add(goToTimeLineItem);
             contextMenu.Items.Add(goToTracingItem);
+            contextMenu.Items.Add(goToDiffItem);
             contextMenu.Items.Add(copyItem);
             contextMenu.Items.Add(copySubtreeItem);
             contextMenu.Items.Add(copyFilePathItem);
@@ -319,6 +326,10 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
             {
                 PopulateTrace();
             }
+            else if (selectedItem.Name == nameof(diffTab))
+            {
+                PopulateDiff();
+            }
         }
 
         private void FilesTree_SearchTextChanged(string text)
@@ -411,6 +422,17 @@ Right-clicking a project node may show the 'Preprocess' option if the version of
                 this.tracing.SetTimeline(timeline, Build.StartTime.Ticks, Build.EndTime.Ticks);
                 this.tracingWatermark.Visibility = Visibility.Hidden;
                 this.tracing.Visibility = Visibility.Visible;
+            }
+        }
+
+        private void PopulateDiff()
+        {
+            if (this.diffModel != null)
+            {
+                this.diffing.BuildControl = this;
+                this.diffWatermark.Visibility = Visibility.Hidden;
+                this.diffing.Visibility = Visibility.Visible;
+                this.diffing.PopulateDiff(diffModel, new DiffPlexDiffDataAdapter(true).Adapt(diffModel.difference));
             }
         }
 
@@ -705,6 +727,7 @@ Recent:
             excludeSubtreeFromSearchItem.Visibility = hasChildren && node is TimedNode ? Visibility.Visible : Visibility.Collapsed;
             goToTimeLineItem.Visibility = node is TimedNode ? Visibility.Visible : Visibility.Collapsed;
             goToTracingItem.Visibility = node is TimedNode ? Visibility.Visible : Visibility.Collapsed;
+            goToDiffItem.Visibility = node is TimedNode ? Visibility.Visible : Visibility.Collapsed;
             copyChildrenItem.Visibility = copySubtreeItem.Visibility;
             sortChildrenItem.Visibility = copySubtreeItem.Visibility;
             preprocessItem.Visibility = node is IPreprocessable p && preprocessedFileManager.CanPreprocess(p) ? Visibility.Visible : Visibility.Collapsed;
@@ -1182,7 +1205,7 @@ Recent:
 
             var items = selectedItem.EnumerateSiblingsCycle();
 
-        search:
+search:
             foreach (var item in items)
             {
                 var text = GetText(item);
@@ -1274,7 +1297,7 @@ Recent:
                 CopyToClipboard(text);
             }
         }
-        
+
         public void ViewSubtreeText()
         {
             if (treeView.SelectedItem is BaseNode treeNode)
@@ -1360,6 +1383,15 @@ Recent:
                 {
                     this.tracing.GoToTimedNode(treeNode);
                 }, DispatcherPriority.Background);
+            }
+        }
+
+        public void GoToDiff()
+        {
+            var treeNode = treeView.SelectedItem as TimedNode;
+            if (treeNode != null)
+            {
+                centralTabControl.SelectedIndex = 3;
             }
         }
 

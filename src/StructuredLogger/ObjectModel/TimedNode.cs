@@ -4,6 +4,13 @@ namespace Microsoft.Build.Logging.StructuredLogger
 {
     public class TimedNode : NamedNode
     {
+        public TimedNode() { }
+
+        public TimedNode(TimedNode copy) : base(copy)
+        {
+
+        }
+
         /// <summary>
         /// The Id of a Project, ProjectEvaluation, Target and Task.
         /// Corresponds to ProjectStartedEventsArgs.ProjectId, TargetStartedEventArgs.TargetId, etc.

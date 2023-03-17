@@ -8,6 +8,17 @@ namespace Microsoft.Build.Logging.StructuredLogger
 {
     public abstract class TreeNode : BaseNode
     {
+
+        public TreeNode()
+        {
+
+        }
+
+        public TreeNode(TreeNode copy)
+        {
+            children = copy.children;
+        }
+
         public bool IsVisible
         {
             get => !HasFlag(NodeFlags.Hidden);
